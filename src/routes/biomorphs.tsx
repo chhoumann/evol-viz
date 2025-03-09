@@ -58,7 +58,7 @@ function BiomorphsSimulation() {
   const zoomRef = useRef<HTMLDivElement>(null);
   const [zoomedBiomorph, setZoomedBiomorph] = useState<Biomorph | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
-  const [showAnimation, setShowAnimation] = useState(true);
+  const [showAnimation] = useState(true);
 
   // Initialize with a random biomorph
   useEffect(() => {
@@ -114,8 +114,8 @@ function BiomorphsSimulation() {
   // Calculate biomorph fitness based on different criteria
   const calculateFitness = (genes: number[], fitnessType: string = "balanced"): number => {
     // Extract genes for readability
-    const [branchAngle, branchLength, branchWidth, recursionDepth, 
-           branchDecay, branchAsymmetry, colorHue, branchCurvature, branchSplits] = genes;
+    const [branchAngle, branchLength, _, recursionDepth, 
+           branchDecay, branchAsymmetry, __, branchCurvature, branchSplits] = genes;
     
     let fitness = 0;
     
@@ -1337,16 +1337,18 @@ function BiomorphsSimulation() {
         </div>
         
         {/* CSS animation keyframes */}
-        <style jsx>{`
-          @keyframes fadeIn {
-            from { opacity: 0; transform: scale(0.9); }
-            to { opacity: 1; transform: scale(1); }
-          }
-          
-          .animate-fadeIn {
-            animation: fadeIn 0.3s ease-out;
-          }
-        `}</style>
+        <style>
+          {`
+            @keyframes fadeIn {
+              from { opacity: 0; transform: scale(0.9); }
+              to { opacity: 1; transform: scale(1); }
+            }
+            
+            .animate-fadeIn {
+              animation: fadeIn 0.3s ease-out;
+            }
+          `}
+        </style>
       </div>
     </div>
   );
