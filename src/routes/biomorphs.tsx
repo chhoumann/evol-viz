@@ -68,6 +68,236 @@ function BiomorphsSimulation() {
     setHistory([initialBiomorph]);
   }, []);
 
+  // Function declarations for drawing functions
+  
+  // Optimized, non-recursive drawing for shallower depths to improve performance
+  const drawOptimizedBiomorph = (
+    ctx: CanvasRenderingContext2D,
+    startX: number,
+    startY: number,
+    params: any
+  ) => {
+    // Pre-calculate all branch positions and paths
+    const branches: Array<[number, number, number, number, number, string, number]> = []; // [startX, startY, endX, endY, depth, color, width]
+    
+    // Start with the trunk
+    const queue: Array<[number, number, number, number, number]> = [];
+    queue.push([startX, startY, -90, params.length, params.depth]); // [x, y, angle, length, depth]
+    
+    // Process queue to calculate all branch positions
+    while (queue.length > 0) {
+      const [x, y, angle, length, depth] = queue.shift()!;
+      if (depth <= 0) continue;
+      
+      // Calculate endpoint
+      const radians = (angle * Math.PI) / 180;
+      const endX = x + length * Math.cos(radians);
+      const endY = y + length * Math.sin(radians);
+      
+      // Store this branch for drawing
+      const color = `hsl(${params.hue + depth * 10}, 70%, ${30 + depth * 5}%)`;
+      const width = params.width * (depth / 5);
+      branches.push([x, y, endX, endY, depth, color, width]);
+      
+      // Add child branches to queue
+      const actualSplits = Math.max(2, Math.min(params.splits, 4));
+      for (let i = 0; i < actualSplits; i++) {
+        let branchOffset = (i / (actualSplits - 1) - 0.5) * 2 * params.angle;
+        
+        // Apply asymmetry
+        if (i % 2 === 0) {
+          branchOffset += params.asymmetry * params.angle;
+        } else {
+          branchOffset -= params.asymmetry * params.angle;
+        }
+        
+        const newAngle = angle + branchOffset + params.curvature * (depth/8);
+        const newLength = length * params.decay;
+        
+        queue.push([endX, endY, newAngle, newLength, depth - 1]);
+      }
+    }
+    
+    // Draw all branches in a single pass, from back to front
+    branches.sort((a, b) => a[4] - b[4]); // Sort by depth
+    
+    for (const [x1, y1, x2, y2, _, color, width] of branches) {
+      ctx.beginPath();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+    }
+  };
+  
+  // Recursive function to draw branches - used for complex cases
+  const drawBranch = (
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    length: number,
+    angle: number,
+    depth: number,
+    branchAngle: number,
+    decay: number,
+    asymmetry: number,
+    hue: number,
+    curvature: number,
+    splits: number,
+    width: number
+  ) => {
+    if (depth <= 0) return;
+    
+    // Calculate endpoint using angle in radians
+    const radians = (angle * Math.PI) / 180;
+    const endX = x + length * Math.cos(radians);
+    const endY = y + length * Math.sin(radians);
+    
+    // Draw this branch
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(endX, endY);
+    
+    // Update color based on depth
+    ctx.strokeStyle = `hsl(${hue + depth * 10}, 70%, ${30 + depth * 5}%)`;
+    ctx.lineWidth = width * (depth / 5);
+    ctx.stroke();
+    
+    // Base angle for the branches
+    const baseAngle = angle;
+    
+    // Calculate how many branches to draw
+    const actualSplits = Math.max(2, Math.min(splits, 4));
+    
+    // Draw branches
+    for (let i = 0; i < actualSplits; i++) {
+      // Calculate the angle for this branch
+      let branchOffset = (i / (actualSplits - 1) - 0.5) * 2 * branchAngle;
+      
+      // Apply asymmetry
+      if (i % 2 === 0) {
+        branchOffset += asymmetry * branchAngle;
+      } else {
+        branchOffset -= asymmetry * branchAngle;
+      }
+      
+      // Create the next branch recursively
+      drawBranch(
+        ctx,
+        endX,
+        endY,
+        length * decay,
+        baseAngle + branchOffset + curvature * (depth/8),
+        depth - 1,
+        branchAngle,
+        decay,
+        asymmetry,
+        hue,
+        curvature,
+        splits,
+        width
+      );
+    }
+  };
+  
+  // Cache for storing pre-calculated drawing parameters
+  const drawingParamsCache = useRef<Map<string, any>>(new Map());
+  
+  // Draw a biomorph on a canvas based on its genes - optimized
+  const drawBiomorph = (biomorph: Biomorph, canvas: HTMLCanvasElement) => {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Check if we've already calculated parameters for this gene set
+    const cacheKey = biomorph.genes.join(',');
+    let drawingParams;
+    
+    if (drawingParamsCache.current.has(cacheKey)) {
+      // Use cached parameters
+      drawingParams = drawingParamsCache.current.get(cacheKey);
+    } else {
+      // Extract gene values
+      const [
+        branchAngle, 
+        branchLength, 
+        branchWidth, 
+        recursionDepth, 
+        branchDecay,
+        branchAsymmetry,
+        colorHue,
+        branchCurvature,
+        branchSplits
+      ] = biomorph.genes;
+      
+      // Map genes to actual drawing parameters
+      drawingParams = {
+        angle: mapValue(branchAngle, -10, 10, 10, 60), // Between 10° and 60°
+        length: mapValue(branchLength, -10, 10, 5, 40), // Between 5px and 40px
+        width: mapValue(branchWidth, -10, 10, 0.5, 5), // Between 0.5px and 5px
+        depth: Math.max(1, Math.floor(mapValue(recursionDepth, -10, 10, 1, 8))), // Between 1 and 8 levels
+        decay: mapValue(branchDecay, -10, 10, 0.5, 0.9), // Length multiplier between 0.5 and 0.9
+        asymmetry: mapValue(branchAsymmetry, -10, 10, -0.5, 0.5), // Between -0.5 and 0.5
+        hue: mapValue(colorHue, -10, 10, 0, 360), // Between 0 and 360 degrees
+        curvature: mapValue(branchCurvature, -10, 10, -30, 30), // Between -30 and 30 degrees
+        splits: Math.max(2, Math.floor(mapValue(branchSplits, -10, 10, 2, 4))), // Between 2 and 4 branches
+      };
+      
+      // Cache the parameters
+      drawingParamsCache.current.set(cacheKey, drawingParams);
+      
+      // Limit cache size to prevent memory issues
+      if (drawingParamsCache.current.size > 500) {
+        // Remove oldest entries when cache gets too large
+        const keys = Array.from(drawingParamsCache.current.keys());
+        for (let i = 0; i < 100; i++) {
+          drawingParamsCache.current.delete(keys[i]);
+        }
+      }
+    }
+    
+    // Center starting point
+    const startX = canvas.width / 2;
+    const startY = canvas.height - 10;
+    
+    // Set initial color and line properties
+    ctx.strokeStyle = `hsl(${drawingParams.hue}, 70%, 50%)`;
+    ctx.lineWidth = drawingParams.width;
+    ctx.lineCap = 'round';
+    
+    // Use a flattened, optimized version of the drawing algorithm for common depths
+    if (drawingParams.depth <= 4) {
+      drawOptimizedBiomorph(ctx, startX, startY, drawingParams);
+    } else {
+      // Draw the recursive structure for more complex cases
+      drawBranch(
+        ctx, 
+        startX, 
+        startY, 
+        drawingParams.length, 
+        -90, // Start growing upward
+        drawingParams.depth, 
+        drawingParams.angle,
+        drawingParams.decay,
+        drawingParams.asymmetry,
+        drawingParams.hue,
+        drawingParams.curvature,
+        drawingParams.splits,
+        drawingParams.width
+      );
+    }
+    
+    // Highlight selected biomorph
+    if (selectedBiomorph && biomorph.id === selectedBiomorph.id) {
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(0, 0, canvas.width, canvas.height);
+    }
+  };
+
   // Draw biomorphs - optimized for performance
   const drawBiomorphRef = useRef(drawBiomorph);
   drawBiomorphRef.current = drawBiomorph;
@@ -247,234 +477,6 @@ function BiomorphsSimulation() {
     }
     
     return offspring;
-  };
-  
-  // Cache for storing pre-calculated drawing parameters
-  const drawingParamsCache = useRef<Map<string, any>>(new Map());
-  
-  // DEVELOPMENT: Draw a biomorph on a canvas based on its genes - optimized
-  const drawBiomorph = (biomorph: Biomorph, canvas: HTMLCanvasElement) => {
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    
-    // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // Check if we've already calculated parameters for this gene set
-    const cacheKey = biomorph.genes.join(',');
-    let drawingParams;
-    
-    if (drawingParamsCache.current.has(cacheKey)) {
-      // Use cached parameters
-      drawingParams = drawingParamsCache.current.get(cacheKey);
-    } else {
-      // Extract gene values
-      const [
-        branchAngle, 
-        branchLength, 
-        branchWidth, 
-        recursionDepth, 
-        branchDecay,
-        branchAsymmetry,
-        colorHue,
-        branchCurvature,
-        branchSplits
-      ] = biomorph.genes;
-      
-      // Map genes to actual drawing parameters
-      drawingParams = {
-        angle: mapValue(branchAngle, -10, 10, 10, 60), // Between 10° and 60°
-        length: mapValue(branchLength, -10, 10, 5, 40), // Between 5px and 40px
-        width: mapValue(branchWidth, -10, 10, 0.5, 5), // Between 0.5px and 5px
-        depth: Math.max(1, Math.floor(mapValue(recursionDepth, -10, 10, 1, 8))), // Between 1 and 8 levels
-        decay: mapValue(branchDecay, -10, 10, 0.5, 0.9), // Length multiplier between 0.5 and 0.9
-        asymmetry: mapValue(branchAsymmetry, -10, 10, -0.5, 0.5), // Between -0.5 and 0.5
-        hue: mapValue(colorHue, -10, 10, 0, 360), // Between 0 and 360 degrees
-        curvature: mapValue(branchCurvature, -10, 10, -30, 30), // Between -30 and 30 degrees
-        splits: Math.max(2, Math.floor(mapValue(branchSplits, -10, 10, 2, 4))), // Between 2 and 4 branches
-      };
-      
-      // Cache the parameters
-      drawingParamsCache.current.set(cacheKey, drawingParams);
-      
-      // Limit cache size to prevent memory issues
-      if (drawingParamsCache.current.size > 500) {
-        // Remove oldest entries when cache gets too large
-        const keys = Array.from(drawingParamsCache.current.keys());
-        for (let i = 0; i < 100; i++) {
-          drawingParamsCache.current.delete(keys[i]);
-        }
-      }
-    }
-    
-    // Center starting point
-    const startX = canvas.width / 2;
-    const startY = canvas.height - 10;
-    
-    // Set initial color and line properties
-    ctx.strokeStyle = `hsl(${drawingParams.hue}, 70%, 50%)`;
-    ctx.lineWidth = drawingParams.width;
-    ctx.lineCap = 'round';
-    
-    // Use a flattened, optimized version of the drawing algorithm for common depths
-    if (drawingParams.depth <= 4) {
-      drawOptimizedBiomorph(ctx, startX, startY, drawingParams);
-    } else {
-      // Draw the recursive structure for more complex cases
-      drawBranch(
-        ctx, 
-        startX, 
-        startY, 
-        drawingParams.length, 
-        -90, // Start growing upward
-        drawingParams.depth, 
-        drawingParams.angle,
-        drawingParams.decay,
-        drawingParams.asymmetry,
-        drawingParams.hue,
-        drawingParams.curvature,
-        drawingParams.splits,
-        drawingParams.width
-      );
-    }
-    
-    // Highlight selected biomorph
-    if (selectedBiomorph && biomorph.id === selectedBiomorph.id) {
-      ctx.strokeStyle = 'white';
-      ctx.lineWidth = 3;
-      ctx.strokeRect(0, 0, canvas.width, canvas.height);
-    }
-  };
-  
-  // Optimized, non-recursive drawing for shallower depths to improve performance
-  const drawOptimizedBiomorph = (
-    ctx: CanvasRenderingContext2D,
-    startX: number,
-    startY: number,
-    params: any
-  ) => {
-    // Pre-calculate all branch positions and paths
-    const branches: Array<[number, number, number, number, number, string, number]> = []; // [startX, startY, endX, endY, depth, color, width]
-    
-    // Start with the trunk
-    const queue: Array<[number, number, number, number, number]> = [];
-    queue.push([startX, startY, -90, params.length, params.depth]); // [x, y, angle, length, depth]
-    
-    // Process queue to calculate all branch positions
-    while (queue.length > 0) {
-      const [x, y, angle, length, depth] = queue.shift()!;
-      if (depth <= 0) continue;
-      
-      // Calculate endpoint
-      const radians = (angle * Math.PI) / 180;
-      const endX = x + length * Math.cos(radians);
-      const endY = y + length * Math.sin(radians);
-      
-      // Store this branch for drawing
-      const color = `hsl(${params.hue + depth * 10}, 70%, ${30 + depth * 5}%)`;
-      const width = params.width * (depth / 5);
-      branches.push([x, y, endX, endY, depth, color, width]);
-      
-      // Add child branches to queue
-      const actualSplits = Math.max(2, Math.min(params.splits, 4));
-      for (let i = 0; i < actualSplits; i++) {
-        let branchOffset = (i / (actualSplits - 1) - 0.5) * 2 * params.angle;
-        
-        // Apply asymmetry
-        if (i % 2 === 0) {
-          branchOffset += params.asymmetry * params.angle;
-        } else {
-          branchOffset -= params.asymmetry * params.angle;
-        }
-        
-        const newAngle = angle + branchOffset + params.curvature * (depth/8);
-        const newLength = length * params.decay;
-        
-        queue.push([endX, endY, newAngle, newLength, depth - 1]);
-      }
-    }
-    
-    // Draw all branches in a single pass, from back to front
-    branches.sort((a, b) => a[4] - b[4]); // Sort by depth
-    
-    for (const [x1, y1, x2, y2, _, color, width] of branches) {
-      ctx.beginPath();
-      ctx.strokeStyle = color;
-      ctx.lineWidth = width;
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
-      ctx.stroke();
-    }
-  };
-  
-  // Recursive function to draw branches - used for complex cases
-  const drawBranch = (
-    ctx: CanvasRenderingContext2D,
-    x: number,
-    y: number,
-    length: number,
-    angle: number,
-    depth: number,
-    branchAngle: number,
-    decay: number,
-    asymmetry: number,
-    hue: number,
-    curvature: number,
-    splits: number,
-    width: number
-  ) => {
-    if (depth <= 0) return;
-    
-    // Calculate endpoint using angle in radians
-    const radians = (angle * Math.PI) / 180;
-    const endX = x + length * Math.cos(radians);
-    const endY = y + length * Math.sin(radians);
-    
-    // Draw this branch
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(endX, endY);
-    
-    // Update color based on depth
-    ctx.strokeStyle = `hsl(${hue + depth * 10}, 70%, ${30 + depth * 5}%)`;
-    ctx.lineWidth = width * (depth / 5);
-    ctx.stroke();
-    
-    // Base angle for the branches
-    const baseAngle = angle;
-    
-    // Calculate how many branches to draw
-    const actualSplits = Math.max(2, Math.min(splits, 4));
-    
-    // Draw branches
-    for (let i = 0; i < actualSplits; i++) {
-      // Calculate the angle for this branch
-      let branchOffset = (i / (actualSplits - 1) - 0.5) * 2 * branchAngle;
-      
-      // Apply asymmetry
-      if (i % 2 === 0) {
-        branchOffset += asymmetry * branchAngle;
-      } else {
-        branchOffset -= asymmetry * branchAngle;
-      }
-      
-      // Create the next branch recursively
-      drawBranch(
-        ctx,
-        endX,
-        endY,
-        length * decay,
-        baseAngle + branchOffset + curvature * (depth/8),
-        depth - 1,
-        branchAngle,
-        decay,
-        asymmetry,
-        hue,
-        curvature,
-        splits,
-        width
-      );
-    }
   };
   
   // Helper function to map a value from one range to another
