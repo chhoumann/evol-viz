@@ -1,15 +1,30 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 
-const TARGET_SENTENCE = "METHINKS IT IS LIKE A WEASEL";
+// Default values
+const DEFAULT_TARGET = "METHINKS IT IS LIKE A WEASEL";
 const CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ ";
-const MUTATION_RATE = 0.05;
+const DEFAULT_MUTATION_RATE = 0.1;
+const DEFAULT_INCORRECT_MUTATION_RATE = 0.7;
+const DEFAULT_POPULATION_SIZE = 10;
+const DEFAULT_UPDATE_SPEED = 50; // milliseconds
 
 export const Route = createFileRoute("/")({
 	component: SelectionVisualization,
 });
 
 function SelectionVisualization() {
+	// User configurable settings
+	const [settings, setSettings] = useState({
+		targetSentence: DEFAULT_TARGET,
+		mutationRate: DEFAULT_MUTATION_RATE,
+		incorrectMutationRate: DEFAULT_INCORRECT_MUTATION_RATE,
+		populationSize: DEFAULT_POPULATION_SIZE,
+		updateSpeed: DEFAULT_UPDATE_SPEED,
+		showSettings: false,
+	});
+
+	// Simulation state
 	const [singleStep, setSingleStep] = useState({
 		currentAttempt: "",
 		attempts: 0,
@@ -28,7 +43,7 @@ function SelectionVisualization() {
 
 	// Generate a random string of the same length as the target
 	const generateRandomString = () => {
-		return Array(TARGET_SENTENCE.length)
+		return Array(settings.targetSentence.length)
 			.fill(0)
 			.map(() => CHARS[Math.floor(Math.random() * CHARS.length)])
 			.join("");
@@ -36,7 +51,24 @@ function SelectionVisualization() {
 
 	// Count how many characters match the target
 	const countMatches = (str: string) => {
-		return [...str].filter((char, i) => char === TARGET_SENTENCE[i]).length;
+		return [...str].filter((char, i) => char === settings.targetSentence[i]).length;
+	};
+	
+	// Toggle settings panel
+	const toggleSettings = () => {
+		setSettings(prev => ({
+			...prev,
+			showSettings: !prev.showSettings
+		}));
+	};
+	
+	// Handle settings input changes
+	const handleSettingChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const { name, value, type } = e.target;
+		setSettings(prev => ({
+			...prev,
+			[name]: type === 'number' ? Number(value) : value
+		}));
 	};
 
 	// Single-step selection
@@ -52,12 +84,12 @@ function SelectionVisualization() {
 				currentAttempt: randomString,
 				attempts: prev.attempts + 1,
 				matchCount: matches,
-				complete: randomString === TARGET_SENTENCE,
+				complete: randomString === settings.targetSentence,
 			}));
-		}, 50);
+		}, settings.updateSpeed);
 
 		return () => clearTimeout(timer);
-	}, [singleStep.running, singleStep.attempts, singleStep.complete]);
+	}, [singleStep.running, singleStep.attempts, singleStep.complete, settings.targetSentence, settings.updateSpeed]);
 
 	// Cumulative selection
 	useEffect(() => {
@@ -66,31 +98,54 @@ function SelectionVisualization() {
 		const timer = setTimeout(() => {
 			let currentString = cumulative.currentAttempt || generateRandomString();
 			
-			// Mutate the string
-			currentString = [...currentString]
-				.map((char, idx) => {
-					// Keep correct characters with higher probability
-					if (char === TARGET_SENTENCE[idx]) {
-						return Math.random() < MUTATION_RATE ? CHARS[Math.floor(Math.random() * CHARS.length)] : char;
-					}
-					// Change incorrect characters with higher probability
-					return Math.random() < 0.5 ? CHARS[Math.floor(Math.random() * CHARS.length)] : char;
-				})
-				.join("");
-
-			const matches = countMatches(currentString);
+			// Generate multiple mutations and select the best one
+			let bestString = currentString;
+			let bestMatches = countMatches(currentString);
+			
+			// Try variations based on population size setting and keep the best one
+			for (let i = 0; i < settings.populationSize; i++) {
+				// Mutate the string
+				const mutatedString = [...currentString]
+					.map((char, idx) => {
+						// Almost never change correct characters (strongly preserve gains)
+						if (char === settings.targetSentence[idx]) {
+							return Math.random() < settings.mutationRate ? CHARS[Math.floor(Math.random() * CHARS.length)] : char;
+						}
+						// Change incorrect characters with high probability
+						return Math.random() < settings.incorrectMutationRate ? CHARS[Math.floor(Math.random() * CHARS.length)] : char;
+					})
+					.join("");
+				
+				const mutatedMatches = countMatches(mutatedString);
+				
+				// Keep the mutation if it's better or equal to what we had
+				if (mutatedMatches >= bestMatches) {
+					bestString = mutatedString;
+					bestMatches = mutatedMatches;
+				}
+			}
 
 			setCumulative((prev) => ({
 				...prev,
-				currentAttempt: currentString,
+				currentAttempt: bestString,
 				attempts: prev.attempts + 1,
-				matchCount: matches,
-				complete: currentString === TARGET_SENTENCE,
+				matchCount: bestMatches,
+				complete: bestString === settings.targetSentence,
 			}));
-		}, 50);
+		}, settings.updateSpeed);
 
 		return () => clearTimeout(timer);
-	}, [cumulative.running, cumulative.attempts, cumulative.currentAttempt, cumulative.complete]);
+	}, [
+		cumulative.running, 
+		cumulative.attempts, 
+		cumulative.currentAttempt, 
+		cumulative.complete, 
+		settings.targetSentence, 
+		settings.mutationRate, 
+		settings.incorrectMutationRate, 
+		settings.populationSize,
+		settings.updateSpeed
+	]);
 
 	const startSimulation = () => {
 		setSingleStep({
@@ -134,7 +189,7 @@ function SelectionVisualization() {
 			<span
 				key={idx}
 				className={
-					char === TARGET_SENTENCE[idx]
+					char === settings.targetSentence[idx]
 						? "text-emerald-400 font-bold animate-pulse"
 						: "text-red-400"
 				}
@@ -154,7 +209,7 @@ function SelectionVisualization() {
 					Single-Step vs. Cumulative Selection
 				</h2>
 
-				<div className="flex justify-center gap-4 mb-12">
+				<div className="flex justify-center gap-4 mb-6">
 					<button
 						onClick={startSimulation}
 						disabled={singleStep.running || cumulative.running}
@@ -168,7 +223,115 @@ function SelectionVisualization() {
 					>
 						Reset
 					</button>
+					<button
+						onClick={toggleSettings}
+						className="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg font-medium transition-colors duration-300"
+					>
+						{settings.showSettings ? "Hide Settings" : "Show Settings"}
+					</button>
 				</div>
+
+				{/* Settings Panel */}
+				{settings.showSettings && (
+					<div className="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-lg mb-8">
+						<h3 className="text-xl font-bold mb-4 text-blue-400">Simulation Settings</h3>
+						
+						<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+							<div>
+								<label className="block text-gray-400 mb-2">Target Sentence</label>
+								<input
+									type="text"
+									name="targetSentence"
+									value={settings.targetSentence}
+									onChange={handleSettingChange}
+									className="w-full bg-gray-700 text-white px-3 py-2 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+									disabled={singleStep.running || cumulative.running}
+								/>
+								<p className="text-xs text-gray-500 mt-1">
+									Use capital letters and spaces only
+								</p>
+							</div>
+							
+							<div>
+								<label className="block text-gray-400 mb-2">Update Speed (ms)</label>
+								<input
+									type="number"
+									name="updateSpeed"
+									min="10"
+									max="1000"
+									step="10"
+									value={settings.updateSpeed}
+									onChange={handleSettingChange}
+									className="w-full bg-gray-700 text-white px-3 py-2 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+								/>
+								<p className="text-xs text-gray-500 mt-1">
+									Lower values = faster simulation (10-1000ms)
+								</p>
+							</div>
+							
+							<div>
+								<label className="block text-gray-400 mb-2">
+									Correct Character Mutation Rate
+								</label>
+								<input
+									type="range"
+									name="mutationRate"
+									min="0.001"
+									max="0.5"
+									step="0.001"
+									value={settings.mutationRate}
+									onChange={handleSettingChange}
+									className="w-full"
+									disabled={singleStep.running || cumulative.running}
+								/>
+								<div className="flex justify-between text-xs text-gray-500">
+									<span>Low: {settings.mutationRate.toFixed(3)}</span>
+									<span>More stable</span>
+								</div>
+							</div>
+							
+							<div>
+								<label className="block text-gray-400 mb-2">
+									Incorrect Character Mutation Rate
+								</label>
+								<input
+									type="range"
+									name="incorrectMutationRate"
+									min="0.1"
+									max="1"
+									step="0.01"
+									value={settings.incorrectMutationRate}
+									onChange={handleSettingChange}
+									className="w-full"
+									disabled={singleStep.running || cumulative.running}
+								/>
+								<div className="flex justify-between text-xs text-gray-500">
+									<span>Low: {settings.incorrectMutationRate.toFixed(2)}</span>
+									<span>High</span>
+								</div>
+							</div>
+							
+							<div>
+								<label className="block text-gray-400 mb-2">
+									Population Size
+								</label>
+								<input
+									type="number"
+									name="populationSize"
+									min="1"
+									max="100"
+									value={settings.populationSize}
+									onChange={handleSettingChange}
+									className="w-full bg-gray-700 text-white px-3 py-2 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+									disabled={singleStep.running || cumulative.running}
+								/>
+								<p className="text-xs text-gray-500 mt-1">
+									More variations tested per generation (1-100)
+								</p>
+							</div>
+						</div>
+					</div>
+				)}
 
 				<div className="grid grid-cols-1 md:grid-cols-2 gap-8">
 					{/* Single-step selection */}
@@ -194,14 +357,14 @@ function SelectionVisualization() {
 							<div className="flex justify-between mb-2">
 								<span>Progress:</span>
 								<span>
-									{singleStep.matchCount}/{TARGET_SENTENCE.length} characters
+									{singleStep.matchCount}/{settings.targetSentence.length} characters
 								</span>
 							</div>
 							<div className="w-full bg-gray-700 rounded-full h-2.5 mb-4">
 								<div
 									className="bg-purple-600 h-2.5 rounded-full transition-all duration-300"
 									style={{
-										width: `${(singleStep.matchCount / TARGET_SENTENCE.length) * 100}%`,
+										width: `${(singleStep.matchCount / settings.targetSentence.length) * 100}%`,
 									}}
 								></div>
 							</div>
@@ -241,14 +404,14 @@ function SelectionVisualization() {
 							<div className="flex justify-between mb-2">
 								<span>Progress:</span>
 								<span>
-									{cumulative.matchCount}/{TARGET_SENTENCE.length} characters
+									{cumulative.matchCount}/{settings.targetSentence.length} characters
 								</span>
 							</div>
 							<div className="w-full bg-gray-700 rounded-full h-2.5 mb-4">
 								<div
 									className="bg-emerald-600 h-2.5 rounded-full transition-all duration-300"
 									style={{
-										width: `${(cumulative.matchCount / TARGET_SENTENCE.length) * 100}%`,
+										width: `${(cumulative.matchCount / settings.targetSentence.length) * 100}%`,
 									}}
 								></div>
 							</div>
