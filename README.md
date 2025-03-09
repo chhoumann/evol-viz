@@ -4,7 +4,7 @@
 
 An interactive visualization demonstrating the power of cumulative selection vs. single-step selection in evolution. Based on Richard Dawkins' "Weasel program" from his book "The Blind Watchmaker."
 
-**Live Demo**: [https://evol-viz.vercel.app](https://evol-viz.vercel.app)
+**Live Demo**: [https://evol-n497kd77y-christian-bager-bach-houmanns-projects.vercel.app](https://evol-n497kd77y-christian-bager-bach-houmanns-projects.vercel.app)
 
 ## What is this?
 
