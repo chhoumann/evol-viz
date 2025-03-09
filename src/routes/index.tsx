@@ -704,6 +704,11 @@ function SelectionVisualization() {
 					</p>
 				</div>
 			)}
+			
+			{/* Footer with attribution */}
+			<div className="py-3 mt-8 text-center text-gray-500 text-xs">
+				Selection Simulator • Built by <a href="https://bagerbach.com" target="_blank" rel="noopener noreferrer" className="hover:text-gray-300 underline">Christian Bager Bach Houmann</a>
+			</div>
 			</div>
 		</div>
 	);

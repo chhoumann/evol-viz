@@ -1537,9 +1537,9 @@ function BiomorphsSimulation() {
           </p>
         </div>
         
-        {/* Footer with version */}
+        {/* Footer with attribution */}
         <div className="py-3 text-center text-gray-500 text-xs">
-          Biomorphs Evolution Simulator v1.0 • Built by <a href="https://bagerbach.com" target="_blank" rel="noopener noreferrer" className="hover:text-gray-300 underline">Christian Bager Bach Houmann</a>
+          Biomorphs Evolution Simulator • Built by <a href="https://bagerbach.com" target="_blank" rel="noopener noreferrer" className="hover:text-gray-300 underline">Christian Bager Bach Houmann</a>
         </div>
         
         {/* CSS animation keyframes */}
