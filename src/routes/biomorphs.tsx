@@ -342,7 +342,11 @@ function BiomorphsSimulation() {
             <div className="flex flex-wrap gap-8">
               <div className="w-48 h-48 bg-gray-900 rounded-lg relative">
                 <canvas 
-                  ref={canvas => canvas && canvasRefs.current.set(`selected-${selectedBiomorph.id}`, canvas)} 
+                  ref={(canvas) => {
+                    if (canvas) {
+                      canvasRefs.current.set(`selected-${selectedBiomorph.id}`, canvas);
+                    }
+                  }} 
                   width={canvasSize} 
                   height={canvasSize}
                   className="w-full h-full"
@@ -415,7 +419,11 @@ function BiomorphsSimulation() {
                 onClick={() => selectBiomorph(biomorph)}
               >
                 <canvas 
-                  ref={canvas => canvas && canvasRefs.current.set(biomorph.id, canvas)} 
+                  ref={(canvas) => {
+                    if (canvas) {
+                      canvasRefs.current.set(biomorph.id, canvas);
+                    }
+                  }} 
                   width={canvasSize} 
                   height={canvasSize}
                   className="w-full aspect-square"
