@@ -1,15 +1,42 @@
-Welcome to your new TanStack app! 
+# Evolution by Selection - Interactive Visualization
 
-# Getting Started
+![Evolution by Selection screenshot](public/og-image.png)
 
-To run this application:
+An interactive visualization demonstrating the power of cumulative selection vs. single-step selection in evolution. Based on Richard Dawkins' "Weasel program" from his book "The Blind Watchmaker."
+
+**Live Demo**: [https://evol-viz.vercel.app](https://evol-viz.vercel.app)
+
+## What is this?
+
+This visualization demonstrates two types of selection processes:
+
+1. **Single-step selection:** Entities are randomly generated and then selected based on their fitness. Each attempt starts from scratch.
+
+2. **Cumulative selection:** Results from one selection round become the starting point for the next, with small mutations introduced. Beneficial mutations are preserved, allowing improvement over generations.
+
+The visualization shows these concepts using a text-matching exercise where the goal is to reach a target phrase. With single-step selection, each attempt starts with a random string. With cumulative selection, each generation builds on the previous one, preserving progress.
+
+## Features
+
+- Interactive side-by-side comparison of both selection methods
+- Customizable settings:
+  - Target sentence
+  - Mutation rates for correct and incorrect characters
+  - Population size
+  - Simulation speed
+- Beautifully designed dark-mode UI with real-time progress tracking
+- Mobile-responsive design
+
+## Getting Started
+
+To run this application locally:
 
 ```bash
 bun install
 bun start
 ```
 
-# Building For Production
+## Building For Production
 
 To build this application for production:
 
