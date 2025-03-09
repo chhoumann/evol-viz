@@ -11,9 +11,16 @@
 // Import Routes
 
 import { Route as rootRoute } from './routes/__root'
+import { Route as BiomorphsImport } from './routes/biomorphs'
 import { Route as IndexImport } from './routes/index'
 
 // Create/Update Routes
+
+const BiomorphsRoute = BiomorphsImport.update({
+  id: '/biomorphs',
+  path: '/biomorphs',
+  getParentRoute: () => rootRoute,
+} as any)
 
 const IndexRoute = IndexImport.update({
   id: '/',
@@ -32,6 +39,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexImport
       parentRoute: typeof rootRoute
     }
+    '/biomorphs': {
+      id: '/biomorphs'
+      path: '/biomorphs'
+      fullPath: '/biomorphs'
+      preLoaderRoute: typeof BiomorphsImport
+      parentRoute: typeof rootRoute
+    }
   }
 }
 
@@ -39,32 +53,37 @@ declare module '@tanstack/react-router' {
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/biomorphs': typeof BiomorphsRoute
 }
 
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/biomorphs': typeof BiomorphsRoute
 }
 
 export interface FileRoutesById {
   __root__: typeof rootRoute
   '/': typeof IndexRoute
+  '/biomorphs': typeof BiomorphsRoute
 }
 
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/biomorphs'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/biomorphs'
+  id: '__root__' | '/' | '/biomorphs'
   fileRoutesById: FileRoutesById
 }
 
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  BiomorphsRoute: typeof BiomorphsRoute
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  BiomorphsRoute: BiomorphsRoute,
 }
 
 export const routeTree = rootRoute
@@ -77,11 +96,15 @@ export const routeTree = rootRoute
     "__root__": {
       "filePath": "__root.tsx",
       "children": [
-        "/"
+        "/",
+        "/biomorphs"
       ]
     },
     "/": {
       "filePath": "index.tsx"
+    },
+    "/biomorphs": {
+      "filePath": "biomorphs.tsx"
     }
   }
 }
