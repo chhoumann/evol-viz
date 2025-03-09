@@ -68,29 +68,17 @@ function BiomorphsSimulation() {
     setHistory([initialBiomorph]);
   }, []);
 
-  // Draw biomorphs when they change
-  useEffect(() => {
+  // Draw biomorphs - optimized for performance
+  const drawBiomorphRef = useRef(drawBiomorph);
+  drawBiomorphRef.current = drawBiomorph;
+  
+  // Draw biomorphs that are visible in the current view
+  const drawVisibleBiomorphs = useCallback(() => {
     // Draw regular biomorphs
     biomorphs.forEach(biomorph => {
       const canvas = canvasRefs.current.get(biomorph.id);
       if (canvas) {
-        drawBiomorph(biomorph, canvas);
-      }
-      
-      // Also draw comparison views if needed
-      if (comparisonBiomorphs.some(b => b.id === biomorph.id)) {
-        const comparisonCanvas = canvasRefs.current.get(`comparison-${biomorph.id}`);
-        if (comparisonCanvas) {
-          drawBiomorph(biomorph, comparisonCanvas);
-        }
-      }
-      
-      // Draw in lineage view if needed
-      if (lineage.some(b => b.id === biomorph.id)) {
-        const lineageCanvas = canvasRefs.current.get(`lineage-${biomorph.id}`);
-        if (lineageCanvas) {
-          drawBiomorph(biomorph, lineageCanvas);
-        }
+        drawBiomorphRef.current(biomorph, canvas);
       }
     });
     
@@ -98,18 +86,43 @@ function BiomorphsSimulation() {
     if (selectedBiomorph) {
       const selectedCanvas = canvasRefs.current.get(`selected-${selectedBiomorph.id}`);
       if (selectedCanvas) {
-        drawBiomorph(selectedBiomorph, selectedCanvas);
+        drawBiomorphRef.current(selectedBiomorph, selectedCanvas);
       }
     }
     
-    // Draw zoomed biomorph
+    // Only draw these if they're currently visible to save performance
+    if (comparisonMode && comparisonBiomorphs.length > 0) {
+      comparisonBiomorphs.forEach(biomorph => {
+        const canvas = canvasRefs.current.get(`comparison-${biomorph.id}`);
+        if (canvas) {
+          drawBiomorphRef.current(biomorph, canvas);
+        }
+      });
+    }
+    
+    if (showLineage && lineage.length > 0) {
+      lineage.forEach(biomorph => {
+        const canvas = canvasRefs.current.get(`lineage-${biomorph.id}`);
+        if (canvas) {
+          drawBiomorphRef.current(biomorph, canvas);
+        }
+      });
+    }
+    
     if (zoomedBiomorph) {
-      const zoomCanvas = canvasRefs.current.get(`zoom-${zoomedBiomorph.id}`);
-      if (zoomCanvas) {
-        drawBiomorph(zoomedBiomorph, zoomCanvas);
+      const canvas = canvasRefs.current.get(`zoom-${zoomedBiomorph.id}`);
+      if (canvas) {
+        drawBiomorphRef.current(zoomedBiomorph, canvas);
       }
     }
-  }, [biomorphs, selectedBiomorph, zoomedBiomorph, comparisonBiomorphs, lineage]);
+  }, [biomorphs, selectedBiomorph, zoomedBiomorph, comparisonMode, comparisonBiomorphs, showLineage, lineage]);
+  
+  // Draw biomorphs when they change, with debounced rendering for performance
+  useEffect(() => {
+    // Use requestAnimationFrame for better performance
+    const frameId = requestAnimationFrame(drawVisibleBiomorphs);
+    return () => cancelAnimationFrame(frameId);
+  }, [drawVisibleBiomorphs]);
   
   // Calculate biomorph fitness based on different criteria
   const calculateFitness = (genes: number[], fitnessType: string = "balanced"): number => {
@@ -236,7 +249,10 @@ function BiomorphsSimulation() {
     return offspring;
   };
   
-  // DEVELOPMENT: Draw a biomorph on a canvas based on its genes
+  // Cache for storing pre-calculated drawing parameters
+  const drawingParamsCache = useRef<Map<string, any>>(new Map());
+  
+  // DEVELOPMENT: Draw a biomorph on a canvas based on its genes - optimized
   const drawBiomorph = (biomorph: Biomorph, canvas: HTMLCanvasElement) => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -244,55 +260,83 @@ function BiomorphsSimulation() {
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Extract gene values
-    const [
-      branchAngle, 
-      branchLength, 
-      branchWidth, 
-      recursionDepth, 
-      branchDecay,
-      branchAsymmetry,
-      colorHue,
-      branchCurvature,
-      branchSplits
-    ] = biomorph.genes;
+    // Check if we've already calculated parameters for this gene set
+    const cacheKey = biomorph.genes.join(',');
+    let drawingParams;
     
-    // Map genes to actual drawing parameters
-    const angle = mapValue(branchAngle, -10, 10, 10, 60); // Between 10° and 60°
-    const length = mapValue(branchLength, -10, 10, 5, 40); // Between 5px and 40px
-    const width = mapValue(branchWidth, -10, 10, 0.5, 5); // Between 0.5px and 5px
-    const depth = Math.max(1, Math.floor(mapValue(recursionDepth, -10, 10, 1, 8))); // Between 1 and 8 levels
-    const decay = mapValue(branchDecay, -10, 10, 0.5, 0.9); // Length multiplier between 0.5 and 0.9
-    const asymmetry = mapValue(branchAsymmetry, -10, 10, -0.5, 0.5); // Between -0.5 and 0.5
-    const hue = mapValue(colorHue, -10, 10, 0, 360); // Between 0 and 360 degrees
-    const curvature = mapValue(branchCurvature, -10, 10, -30, 30); // Between -30 and 30 degrees
-    const splits = Math.max(2, Math.floor(mapValue(branchSplits, -10, 10, 2, 4))); // Between 2 and 4 branches
+    if (drawingParamsCache.current.has(cacheKey)) {
+      // Use cached parameters
+      drawingParams = drawingParamsCache.current.get(cacheKey);
+    } else {
+      // Extract gene values
+      const [
+        branchAngle, 
+        branchLength, 
+        branchWidth, 
+        recursionDepth, 
+        branchDecay,
+        branchAsymmetry,
+        colorHue,
+        branchCurvature,
+        branchSplits
+      ] = biomorph.genes;
+      
+      // Map genes to actual drawing parameters
+      drawingParams = {
+        angle: mapValue(branchAngle, -10, 10, 10, 60), // Between 10° and 60°
+        length: mapValue(branchLength, -10, 10, 5, 40), // Between 5px and 40px
+        width: mapValue(branchWidth, -10, 10, 0.5, 5), // Between 0.5px and 5px
+        depth: Math.max(1, Math.floor(mapValue(recursionDepth, -10, 10, 1, 8))), // Between 1 and 8 levels
+        decay: mapValue(branchDecay, -10, 10, 0.5, 0.9), // Length multiplier between 0.5 and 0.9
+        asymmetry: mapValue(branchAsymmetry, -10, 10, -0.5, 0.5), // Between -0.5 and 0.5
+        hue: mapValue(colorHue, -10, 10, 0, 360), // Between 0 and 360 degrees
+        curvature: mapValue(branchCurvature, -10, 10, -30, 30), // Between -30 and 30 degrees
+        splits: Math.max(2, Math.floor(mapValue(branchSplits, -10, 10, 2, 4))), // Between 2 and 4 branches
+      };
+      
+      // Cache the parameters
+      drawingParamsCache.current.set(cacheKey, drawingParams);
+      
+      // Limit cache size to prevent memory issues
+      if (drawingParamsCache.current.size > 500) {
+        // Remove oldest entries when cache gets too large
+        const keys = Array.from(drawingParamsCache.current.keys());
+        for (let i = 0; i < 100; i++) {
+          drawingParamsCache.current.delete(keys[i]);
+        }
+      }
+    }
     
     // Center starting point
     const startX = canvas.width / 2;
     const startY = canvas.height - 10;
     
     // Set initial color and line properties
-    ctx.strokeStyle = `hsl(${hue}, 70%, 50%)`;
-    ctx.lineWidth = width;
+    ctx.strokeStyle = `hsl(${drawingParams.hue}, 70%, 50%)`;
+    ctx.lineWidth = drawingParams.width;
     ctx.lineCap = 'round';
     
-    // Draw the recursive structure
-    drawBranch(
-      ctx, 
-      startX, 
-      startY, 
-      length, 
-      -90, // Start growing upward
-      depth, 
-      angle,
-      decay,
-      asymmetry,
-      hue,
-      curvature,
-      splits,
-      width
-    );
+    // Use a flattened, optimized version of the drawing algorithm for common depths
+    if (drawingParams.depth <= 4) {
+      drawOptimizedBiomorph(ctx, startX, startY, drawingParams);
+    } else {
+      // Draw the recursive structure for more complex cases
+      drawBranch(
+        ctx, 
+        startX, 
+        startY, 
+        drawingParams.length, 
+        -90, // Start growing upward
+        drawingParams.depth, 
+        drawingParams.angle,
+        drawingParams.decay,
+        drawingParams.asymmetry,
+        drawingParams.hue,
+        drawingParams.curvature,
+        drawingParams.splits,
+        drawingParams.width
+      );
+    }
     
     // Highlight selected biomorph
     if (selectedBiomorph && biomorph.id === selectedBiomorph.id) {
@@ -302,7 +346,68 @@ function BiomorphsSimulation() {
     }
   };
   
-  // Recursive function to draw branches
+  // Optimized, non-recursive drawing for shallower depths to improve performance
+  const drawOptimizedBiomorph = (
+    ctx: CanvasRenderingContext2D,
+    startX: number,
+    startY: number,
+    params: any
+  ) => {
+    // Pre-calculate all branch positions and paths
+    const branches: Array<[number, number, number, number, number, string, number]> = []; // [startX, startY, endX, endY, depth, color, width]
+    
+    // Start with the trunk
+    const queue: Array<[number, number, number, number, number]> = [];
+    queue.push([startX, startY, -90, params.length, params.depth]); // [x, y, angle, length, depth]
+    
+    // Process queue to calculate all branch positions
+    while (queue.length > 0) {
+      const [x, y, angle, length, depth] = queue.shift()!;
+      if (depth <= 0) continue;
+      
+      // Calculate endpoint
+      const radians = (angle * Math.PI) / 180;
+      const endX = x + length * Math.cos(radians);
+      const endY = y + length * Math.sin(radians);
+      
+      // Store this branch for drawing
+      const color = `hsl(${params.hue + depth * 10}, 70%, ${30 + depth * 5}%)`;
+      const width = params.width * (depth / 5);
+      branches.push([x, y, endX, endY, depth, color, width]);
+      
+      // Add child branches to queue
+      const actualSplits = Math.max(2, Math.min(params.splits, 4));
+      for (let i = 0; i < actualSplits; i++) {
+        let branchOffset = (i / (actualSplits - 1) - 0.5) * 2 * params.angle;
+        
+        // Apply asymmetry
+        if (i % 2 === 0) {
+          branchOffset += params.asymmetry * params.angle;
+        } else {
+          branchOffset -= params.asymmetry * params.angle;
+        }
+        
+        const newAngle = angle + branchOffset + params.curvature * (depth/8);
+        const newLength = length * params.decay;
+        
+        queue.push([endX, endY, newAngle, newLength, depth - 1]);
+      }
+    }
+    
+    // Draw all branches in a single pass, from back to front
+    branches.sort((a, b) => a[4] - b[4]); // Sort by depth
+    
+    for (const [x1, y1, x2, y2, _, color, width] of branches) {
+      ctx.beginPath();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+    }
+  };
+  
+  // Recursive function to draw branches - used for complex cases
   const drawBranch = (
     ctx: CanvasRenderingContext2D,
     x: number,
@@ -328,17 +433,7 @@ function BiomorphsSimulation() {
     // Draw this branch
     ctx.beginPath();
     ctx.moveTo(x, y);
-    
-    // Apply curvature if needed
-    if (Math.abs(curvature) > 0.1) {
-      const controlX = x + length * 0.5 * Math.cos(radians) + 
-                       length * 0.2 * Math.cos(radians + Math.PI/2) * (curvature/30);
-      const controlY = y + length * 0.5 * Math.sin(radians) + 
-                       length * 0.2 * Math.sin(radians + Math.PI/2) * (curvature/30);
-      ctx.quadraticCurveTo(controlX, controlY, endX, endY);
-    } else {
-      ctx.lineTo(endX, endY);
-    }
+    ctx.lineTo(endX, endY);
     
     // Update color based on depth
     ctx.strokeStyle = `hsl(${hue + depth * 10}, 70%, ${30 + depth * 5}%)`;
@@ -553,11 +648,18 @@ function BiomorphsSimulation() {
     }
   };
   
-  // Run one step of auto-evolution
+  // Previous fitness for optimization
+  const prevFitnessRef = useRef<number>(0);
+  
+  // Run one step of auto-evolution - optimized
   const runAutoEvolutionStep = useCallback(() => {
     if (!autoEvolving || !selectedBiomorph) return;
     
-    // Generate offspring
+    // Skip updating history and lineage if fitness hasn't improved significantly
+    const currentFitness = selectedBiomorph.fitness || 0;
+    const fitnessImproved = currentFitness > prevFitnessRef.current + 0.5;
+    
+    // Generate offspring - with optimization to avoid re-rendering too frequently
     const offspring = createOffspring(selectedBiomorph);
     
     // Select the fittest offspring based on the fitness function
@@ -565,30 +667,57 @@ function BiomorphsSimulation() {
       (b.fitness || 0) - (a.fitness || 0)
     )[0];
     
-    // Update history
-    setHistory(prev => [...prev, fittestOffspring]);
+    // Only update history and lineage periodically or when fitness improves
+    if (fitnessImproved || autoEvolutionGeneration % 5 === 0) {
+      // Update history (with limit to prevent memory issues)
+      setHistory(prev => {
+        const newHistory = [...prev, fittestOffspring];
+        // Keep max 1000 items in history to prevent slowdowns
+        return newHistory.length > 1000 ? newHistory.slice(-1000) : newHistory;
+      });
+      
+      // Update lineage if visible
+      if (showLineage) {
+        setLineage(findLineage(fittestOffspring));
+      }
+      
+      // Store current fitness for future comparison
+      prevFitnessRef.current = fittestOffspring.fitness || 0;
+    }
     
-    // Update selected biomorph and offspring
+    // Always update selected biomorph and offspring
     setSelectedBiomorph(fittestOffspring);
     setBiomorphs(createOffspring(fittestOffspring));
     
     // Update generation count
     setGenerations(fittestOffspring.generation);
     setAutoEvolutionGeneration(prev => prev + 1);
-    
-    // Update lineage
-    setLineage(findLineage(fittestOffspring));
-  }, [autoEvolving, selectedBiomorph, createOffspring, findLineage]);
+  }, [autoEvolving, selectedBiomorph, createOffspring, findLineage, autoEvolutionGeneration, showLineage]);
   
-  // Auto-evolution timer effect
+  // Track active state to prevent overlapping auto-evolution steps
+  const isRunningRef = useRef(false);
+
+  // Auto-evolution timer effect - optimized
   useEffect(() => {
-    if (!autoEvolving) return;
+    if (!autoEvolving) {
+      isRunningRef.current = false;
+      return;
+    }
+    
+    // Prevent multiple simultaneous auto-evolution steps
+    if (isRunningRef.current) return;
+    
+    isRunningRef.current = true;
     
     const timer = setTimeout(() => {
       runAutoEvolutionStep();
+      isRunningRef.current = false;
     }, evolutionSpeed);
     
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      isRunningRef.current = false;
+    };
   }, [autoEvolving, evolutionSpeed, runAutoEvolutionStep, autoEvolutionGeneration]);
   
   // Change the fitness function
@@ -1087,25 +1216,36 @@ function BiomorphsSimulation() {
           </h2>
           
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {biomorphs.map(biomorph => {
-              // Calculate additional information for display
+            {/* Render a limited number of biomorphs to improve performance */}
+            {biomorphs.slice(0, autoEvolving ? 12 : biomorphs.length).map(biomorph => {
+              // Calculate additional information for display - only when needed
               const isFittest = biomorph.fitness !== undefined && 
-                biomorphs.every(b => (b.fitness || 0) <= (biomorph.fitness || 0));
+                // Only check current item against the max fitness rather than iterating all biomorphs
+                (autoEvolving ? 
+                  biomorph.fitness >= (biomorphs[0]?.fitness || 0) : 
+                  biomorphs.every(b => (b.fitness || 0) <= (biomorph.fitness || 0)));
               
               // Calculate genetic distance from selected biomorph if in comparison mode
               const distanceFromSelected = comparisonMode && comparisonBiomorphs.length === 1 && 
-                selectedBiomorph ? geneticDistance(biomorph, comparisonBiomorphs[0]) : null;
+                comparisonBiomorphs[0] ? geneticDistance(biomorph, comparisonBiomorphs[0]) : null;
+              
+              // Optimized class calculation - avoid string template for better performance
+              let classes = "w-full bg-gray-900 rounded-lg p-2 cursor-pointer transition-all hover:scale-105";
+              
+              if (selectedBiomorph && selectedBiomorph.id === biomorph.id) {
+                classes += " ring-2 ring-white";
+              } else if (comparisonBiomorphs.some(b => b.id === biomorph.id)) {
+                classes += " ring-2 ring-blue-400";
+              }
+              
+              if (showAnimation && !viewingHistory && !autoEvolving) {
+                classes += " animate-fadeIn";
+              }
               
               return (
                 <div 
                   key={biomorph.id}
-                  className={`w-full bg-gray-900 rounded-lg p-2 cursor-pointer transition-all hover:scale-105 ${
-                    selectedBiomorph && selectedBiomorph.id === biomorph.id 
-                      ? 'ring-2 ring-white' 
-                      : comparisonBiomorphs.some(b => b.id === biomorph.id)
-                        ? 'ring-2 ring-blue-400'
-                        : ''
-                  } ${showAnimation && !viewingHistory ? 'animate-fadeIn' : ''}`}
+                  className={classes}
                   onClick={() => selectBiomorph(biomorph)}
                 >
                   <div className="relative">
@@ -1120,16 +1260,16 @@ function BiomorphsSimulation() {
                       className="w-full aspect-square"
                     />
                     
-                    {/* Fitness indicator for auto-evolution */}
-                    {biomorph.fitness !== undefined && (
+                    {/* Fitness indicator for auto-evolution - only show if needed */}
+                    {biomorph.fitness !== undefined && (autoEvolving || comparisonMode) && (
                       <div className={`absolute top-1 right-1 rounded-full px-1.5 py-0.5 text-xs 
                         ${isFittest ? 'bg-green-600' : 'bg-blue-800'}`}>
                         {biomorph.fitness.toFixed(1)}
                       </div>
                     )}
                     
-                    {/* Comparison distance indicator */}
-                    {distanceFromSelected !== null && (
+                    {/* Comparison distance indicator - only show in comparison mode */}
+                    {distanceFromSelected !== null && comparisonMode && (
                       <div className="absolute bottom-1 right-1 bg-gray-800 rounded-full px-1.5 py-0.5 text-xs">
                         Δ{distanceFromSelected}
                       </div>
@@ -1161,6 +1301,13 @@ function BiomorphsSimulation() {
                 </div>
               );
             })}
+            
+            {/* Show count indicator when limiting displayed biomorphs */}
+            {autoEvolving && biomorphs.length > 12 && (
+              <div className="col-span-full text-center text-sm text-gray-400 mt-4">
+                Showing 12 of {biomorphs.length} biomorphs for better performance.
+              </div>
+            )}
           </div>
         </div>
         
