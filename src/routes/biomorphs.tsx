@@ -744,7 +744,7 @@ function BiomorphsSimulation() {
   };
   
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-4">
+    <div className="min-h-screen bg-gray-900 text-white p-4 pb-0">
       <div className="max-w-6xl mx-auto">
         <h1 className="text-4xl font-bold text-center mb-2 bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">
           Biomorphs Evolution
@@ -1108,8 +1108,7 @@ function BiomorphsSimulation() {
                 {/* Carousel container */}
                 <div 
                   id="lineage-carousel"
-                  className="flex items-center gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-900 flex-grow"
-                  style={{ scrollbarWidth: 'thin' }}
+                  className="flex items-center gap-4 overflow-x-auto pb-4 flex-grow"
                 >
                   {/* Connection line */}
                   <div className="absolute top-1/2 left-12 right-12 h-0.5 bg-gray-600 -translate-y-1/2 z-0"></div>
@@ -1510,7 +1509,7 @@ function BiomorphsSimulation() {
         )}
         
         {/* Explanation */}
-        <div className="mt-8 bg-gray-800 rounded-xl p-6 border border-gray-700">
+        <div className="mt-8 mb-8 bg-gray-800 rounded-xl p-6 border border-gray-700">
           <h3 className="text-2xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">
             How This Works
           </h3>
@@ -1536,6 +1535,11 @@ function BiomorphsSimulation() {
             that appeal to you. This mirrors how artificial selection works in breeding plants and animals,
             and serves as a simplified model of natural selection.
           </p>
+        </div>
+        
+        {/* Footer with version */}
+        <div className="py-3 text-center text-gray-500 text-xs">
+          Biomorphs Evolution Simulator v1.0
         </div>
         
         {/* CSS animation keyframes */}
