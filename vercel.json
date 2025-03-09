@@ -1,9 +1,9 @@
 {
   "framework": "vite",
-  "buildCommand": "npm install && npm run build",
+  "buildCommand": "bun install && bun run build",
   "outputDirectory": "dist",
-  "installCommand": "npm install",
-  "devCommand": "npm run start",
+  "installCommand": "bun install",
+  "devCommand": "bun run start",
   "headers": [
     {
       "source": "/(.*)\\.js",
