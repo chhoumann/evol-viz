@@ -1077,54 +1077,107 @@ function BiomorphsSimulation() {
           </div>
         )}
         
-        {/* Lineage View */}
+        {/* Lineage View - Carousel */}
         {showLineage && lineage.length > 1 && (
           <div className="bg-gray-800 rounded-xl p-4 mb-8">
-            <h2 className="text-xl font-bold mb-4">Evolutionary Lineage</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold">Evolutionary Lineage</h2>
+              <div className="text-sm text-gray-400">
+                Generation {lineage[0]?.generation} to {lineage[lineage.length - 1]?.generation}
+              </div>
+            </div>
             
             <div className="relative">
-              {/* Connection lines between ancestors */}
-              <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-gray-600 -translate-y-1/2 z-0"></div>
-              
-              <div className="flex justify-between items-center relative z-10">
-                {lineage.map((ancestor, index) => (
-                  <div 
-                    key={ancestor.id} 
-                    className={`flex flex-col items-center ${
-                      index === lineage.length - 1 ? 'text-emerald-400' : ''
-                    }`}
-                  >
-                    <div className="w-16 h-16 md:w-24 md:h-24 bg-gray-900 rounded-lg mb-2 flex-shrink-0 relative">
-                      <canvas 
-                        ref={(canvas) => {
-                          if (canvas) {
-                            canvasRefs.current.set(`lineage-${ancestor.id}`, canvas);
-                          }
-                        }} 
-                        width={canvasSize} 
-                        height={canvasSize}
-                        className="w-full h-full cursor-pointer"
-                        onClick={() => selectBiomorph(ancestor)}
-                      />
+              {/* Horizontal scrolling container */}
+              <div className="flex items-center">
+                {/* Left scroll button */}
+                <button 
+                  className="bg-gray-700 hover:bg-gray-600 p-2 rounded-full mr-2 flex-shrink-0"
+                  onClick={() => {
+                    const container = document.getElementById('lineage-carousel');
+                    if (container) {
+                      container.scrollBy({ left: -200, behavior: 'smooth' });
+                    }
+                  }}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+
+                {/* Carousel container */}
+                <div 
+                  id="lineage-carousel"
+                  className="flex items-center gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-900 flex-grow"
+                  style={{ scrollbarWidth: 'thin' }}
+                >
+                  {/* Connection line */}
+                  <div className="absolute top-1/2 left-12 right-12 h-0.5 bg-gray-600 -translate-y-1/2 z-0"></div>
+                  
+                  {/* Biomorphs */}
+                  {lineage.map((ancestor, index) => (
+                    <div 
+                      key={ancestor.id} 
+                      className={`flex flex-col items-center flex-shrink-0 relative ${
+                        index === lineage.length - 1 ? 'text-emerald-400' : ''
+                      }`}
+                    >
+                      <div className="w-20 h-20 md:w-28 md:h-28 bg-gray-900 rounded-lg mb-2 flex-shrink-0 relative z-10">
+                        <canvas 
+                          ref={(canvas) => {
+                            if (canvas) {
+                              canvasRefs.current.set(`lineage-${ancestor.id}`, canvas);
+                            }
+                          }} 
+                          width={canvasSize} 
+                          height={canvasSize}
+                          className="w-full h-full cursor-pointer rounded-lg"
+                          onClick={() => selectBiomorph(ancestor)}
+                        />
+                        
+                        {/* Generation label */}
+                        <div className="absolute top-0 right-0 bg-gray-800 text-xs px-1 rounded-bl">
+                          G{ancestor.generation}
+                        </div>
+                        
+                        {/* Highlight current biomorph */}
+                        {index === lineage.length - 1 && (
+                          <div className="absolute inset-0 ring-2 ring-emerald-400 rounded-lg pointer-events-none"></div>
+                        )}
+                      </div>
                       
-                      {/* Generation label */}
-                      <div className="absolute top-0 right-0 bg-gray-800 text-xs px-1 rounded-bl">
-                        G{ancestor.generation}
+                      {/* Arrows between generations */}
+                      {index < lineage.length - 1 && (
+                        <div className="absolute left-full top-10 translate-x-1 z-10">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-gray-600">
+                            <path d="M13 5l7 7-7 7M5 12h15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </div>
+                      )}
+                      
+                      <div className="text-xs mt-1 z-10">
+                        {index === 0 && "First"}
+                        {index === lineage.length - 1 && "Current"}
+                        {index !== 0 && index !== lineage.length - 1 && `Gen ${ancestor.generation}`}
                       </div>
                     </div>
-                    
-                    {/* Arrows between generations */}
-                    {index < lineage.length - 1 && (
-                      <div className="absolute left-0 right-0 top-1/2 flex justify-center -translate-y-1/2 z-0">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-gray-600">
-                          <path d="M13 5l7 7-7 7M5 12h15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      </div>
-                    )}
-                    
-                    <div className="text-xs mt-1">Gen {ancestor.generation}</div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+                
+                {/* Right scroll button */}
+                <button 
+                  className="bg-gray-700 hover:bg-gray-600 p-2 rounded-full ml-2 flex-shrink-0"
+                  onClick={() => {
+                    const container = document.getElementById('lineage-carousel');
+                    if (container) {
+                      container.scrollBy({ left: 200, behavior: 'smooth' });
+                    }
+                  }}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
               </div>
               
               <div className="mt-4 text-center text-sm text-gray-400">
