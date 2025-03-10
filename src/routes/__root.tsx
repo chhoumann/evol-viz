@@ -1,4 +1,4 @@
-import { Outlet, createRootRoute, Link } from "@tanstack/react-router";
+import { Link, Outlet, createRootRoute } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/router-devtools";
 
 export const Route = createRootRoute({
@@ -7,7 +7,9 @@ export const Route = createRootRoute({
 			<nav className="bg-gray-800 text-white p-4 shadow-md">
 				<div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between">
 					<div className="flex items-center">
-						<span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-emerald-400 bg-clip-text text-transparent">Evolution Simulations</span>
+						<span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-emerald-400 bg-clip-text text-transparent">
+							Evolution Simulations
+						</span>
 					</div>
 					<div className="flex gap-6">
 						<Link
@@ -28,7 +30,7 @@ export const Route = createRootRoute({
 				</div>
 			</nav>
 			<Outlet />
-			<TanStackRouterDevtools />
+			{import.meta.env.DEV && <TanStackRouterDevtools />}
 		</>
 	),
 });
