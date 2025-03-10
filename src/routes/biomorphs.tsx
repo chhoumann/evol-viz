@@ -644,8 +644,9 @@ function BiomorphsSimulation() {
       if (!selectedBiomorph) {
         const randomBiomorph = createRandomBiomorph();
         setSelectedBiomorph(randomBiomorph);
-        setHistory([randomBiomorph]);
+        setHistory(prev => [...prev, randomBiomorph]);
         setBiomorphs(createOffspring(randomBiomorph));
+        setGenerations(0);
       }
     }
   };
@@ -791,7 +792,7 @@ function BiomorphsSimulation() {
               
               <button
                 onClick={toggleLineage}
-                disabled={!selectedBiomorph || selectedBiomorph.generation <= 0}
+                disabled={!selectedBiomorph}
                 className={`${showLineage ? 'bg-purple-700' : 'bg-purple-600 hover:bg-purple-700'} px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50`}
               >
                 {showLineage ? 'Hide Lineage' : 'Show Lineage'}
@@ -915,7 +916,14 @@ function BiomorphsSimulation() {
                         onChange={(e) => handleGeneValueChange(index, Number(e.target.value))}
                         className="flex-1 mr-2"
                       />
-                      <span className="w-8 text-center">{value}</span>
+                      <input
+                        type="number"
+                        min="-10"
+                        max="10"
+                        value={value}
+                        onChange={(e) => handleGeneValueChange(index, Math.max(-10, Math.min(10, Number(e.target.value))))}
+                        className="w-12 bg-gray-700 text-white px-1 py-1 rounded-md border border-gray-600 text-center"
+                      />
                     </div>
                   </div>
                 ))}
@@ -934,7 +942,13 @@ function BiomorphsSimulation() {
                 </button>
                 
                 <button
-                  onClick={() => setEditingGenes(false)}
+                  onClick={() => {
+                    // Reset to original gene values and exit editing mode
+                    if (selectedBiomorph) {
+                      setGeneEditValues([...selectedBiomorph.genes]);
+                    }
+                    setEditingGenes(false);
+                  }}
                   className="bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded-lg font-medium transition-colors mr-3"
                 >
                   Cancel
@@ -1096,7 +1110,13 @@ function BiomorphsSimulation() {
                   onClick={() => {
                     const container = document.getElementById('lineage-carousel');
                     if (container) {
-                      container.scrollBy({ left: -200, behavior: 'smooth' });
+                      // First try smooth scrolling
+                      try {
+                        container.scrollBy({ left: -200, behavior: 'smooth' });
+                      } catch (e) {
+                        // Fallback for browsers that don't support smooth scrolling
+                        container.scrollLeft -= 200;
+                      }
                     }
                   }}
                 >
@@ -1169,7 +1189,13 @@ function BiomorphsSimulation() {
                   onClick={() => {
                     const container = document.getElementById('lineage-carousel');
                     if (container) {
-                      container.scrollBy({ left: 200, behavior: 'smooth' });
+                      // First try smooth scrolling
+                      try {
+                        container.scrollBy({ left: 200, behavior: 'smooth' });
+                      } catch (e) {
+                        // Fallback for browsers that don't support smooth scrolling
+                        container.scrollLeft += 200;
+                      }
                     }
                   }}
                 >
