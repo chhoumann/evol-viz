@@ -59,6 +59,7 @@ function BiomorphsSimulation() {
   const [zoomedBiomorph, setZoomedBiomorph] = useState<Biomorph | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [showAnimation] = useState(true);
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
 
   // Initialize with a random biomorph
   useEffect(() => {
@@ -354,6 +355,42 @@ function BiomorphsSimulation() {
     return () => cancelAnimationFrame(frameId);
   }, [drawVisibleBiomorphs]);
   
+  // Add keyboard shortcut support for navigation and selection
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't handle key events when in an input/editing mode
+      if (editingGenes || zoomedBiomorph) return;
+      
+      switch(e.key) {
+        case '1': case '2': case '3': case '4': case '5': 
+        case '6': case '7': case '8': case '9':
+          // Select biomorph by number
+          const index = parseInt(e.key) - 1;
+          if (biomorphs[index]) {
+            selectBiomorph(biomorphs[index]);
+          }
+          break;
+        case 'r':
+          // Random new style
+          if (!e.ctrlKey && !e.metaKey) { // Avoid collision with browser refresh
+            const newBiomorph = createRandomBiomorph();
+            setBiomorphs(createOffspring(newBiomorph));
+            setSelectedBiomorph(newBiomorph);
+            setHistory(prev => [...prev, newBiomorph]);
+            setGenerations(0);
+          }
+          break;
+        case 'a':
+          // Toggle auto-evolution
+          toggleAutoEvolution();
+          break;
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [biomorphs, editingGenes, zoomedBiomorph, toggleAutoEvolution]);
+  
   // Calculate biomorph fitness based on different criteria
   const calculateFitness = (genes: number[], fitnessType: string = "balanced"): number => {
     // Extract genes for readability
@@ -399,8 +436,23 @@ function BiomorphsSimulation() {
 
   // Create a new random biomorph
   const createRandomBiomorph = (): Biomorph => {
-    // Generate 9 random genes with values between -10 and 10
-    const genes = Array.from({ length: 9 }, () => Math.floor(Math.random() * 21) - 10);
+    // Generate 9 random genes with values between -10 and 10,
+    // but with constraints to ensure good visibility
+    const genes = Array.from({ length: 9 }, (_, index) => {
+      // Apply constraints to specific genes to avoid "bad starts"
+      switch (index) {
+        case 1: // Branch length - ensure reasonable minimum length
+          return Math.floor(Math.random() * 15) - 5; // Range from -5 to 9 (bias toward longer branches)
+        case 2: // Branch width - ensure reasonable minimum width
+          return Math.floor(Math.random() * 15) - 5; // Range from -5 to 9 (bias toward thicker branches)
+        case 3: // Recursion depth - ensure enough complexity
+          return Math.floor(Math.random() * 10); // Range from 0 to 9 (bias toward deeper structures)
+        case 4: // Branch decay - bias toward less decay for visibility
+          return Math.floor(Math.random() * 15) - 5; // Range from -5 to 9 (bias toward slower decay)
+        default:
+          return Math.floor(Math.random() * 21) - 10; // Standard range from -10 to 10
+      }
+    });
     
     // Calculate fitness
     const fitness = calculateFitness(genes, fitnessFunction);
@@ -783,6 +835,22 @@ function BiomorphsSimulation() {
               </button>
               
               <button 
+                onClick={() => {
+                  // Generate a new initial biomorph without resetting everything
+                  const newBiomorph = createRandomBiomorph();
+                  setBiomorphs(createOffspring(newBiomorph));
+                  setSelectedBiomorph(newBiomorph);
+                  setHistory(prev => [...prev, newBiomorph]);
+                  setGenerations(0);
+                  setViewingHistory(false);
+                  setShowLineage(false);
+                }}
+                className="bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded-lg font-medium transition-colors"
+              >
+                New Random Style
+              </button>
+              
+              <button 
                 onClick={viewHistory}
                 disabled={history.length <= 1}
                 className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50"
@@ -818,6 +886,13 @@ function BiomorphsSimulation() {
                 className={`${autoEvolving ? 'bg-pink-700' : 'bg-pink-600 hover:bg-pink-700'} px-4 py-2 rounded-lg font-medium transition-colors`}
               >
                 {autoEvolving ? 'Stop Evolution' : 'Auto-Evolve'}
+              </button>
+              
+              <button
+                onClick={() => setShowKeyboardHelp(!showKeyboardHelp)}
+                className="bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded-lg font-medium transition-colors"
+              >
+                <span role="img" aria-label="keyboard">⌨️</span> Shortcuts
               </button>
             </div>
           </div>
@@ -960,6 +1035,39 @@ function BiomorphsSimulation() {
                 >
                   Apply Changes
                 </button>
+              </div>
+            </div>
+          )}
+          
+          {/* Keyboard shortcuts help panel */}
+          {showKeyboardHelp && (
+            <div className="mt-4 p-3 bg-gray-700 rounded-lg">
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-lg font-semibold">Keyboard Shortcuts</h3>
+                <button 
+                  onClick={() => setShowKeyboardHelp(false)}
+                  className="text-gray-400 hover:text-white"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                <div className="bg-gray-800 p-2 rounded">
+                  <span className="font-mono bg-gray-700 px-1 rounded">1-9</span>
+                  <span className="ml-2">Select biomorph by number</span>
+                </div>
+                <div className="bg-gray-800 p-2 rounded">
+                  <span className="font-mono bg-gray-700 px-1 rounded">R</span>
+                  <span className="ml-2">New random style</span>
+                </div>
+                <div className="bg-gray-800 p-2 rounded">
+                  <span className="font-mono bg-gray-700 px-1 rounded">A</span>
+                  <span className="ml-2">Toggle auto-evolution</span>
+                </div>
               </div>
             </div>
           )}
@@ -1347,6 +1455,11 @@ function BiomorphsSimulation() {
                         {biomorph.fitness.toFixed(1)}
                       </div>
                     )}
+                    
+                    {/* Number indicator for keyboard selection */}
+                    <div className="absolute bottom-1 left-1 bg-gray-800 bg-opacity-70 rounded-full w-5 h-5 flex items-center justify-center text-xs">
+                      {biomorphs.indexOf(biomorph) + 1}
+                    </div>
                     
                     {/* Comparison distance indicator - only show in comparison mode */}
                     {distanceFromSelected !== null && comparisonMode && (
